@@ -73,6 +73,7 @@ public class MainViewModel : INotifyPropertyChanged
         if (File.Exists(filePath))
         {
             var fileInfo = new FileInfo(filePath);
+
             return fileInfo.Length / 1024f;
         }
 
@@ -103,6 +104,7 @@ public class MainViewModel : INotifyPropertyChanged
             Files.Clear();
             DirectoryContents.Clear();
             SelectedFileDetails = null!;
+
             return;
         }
 
