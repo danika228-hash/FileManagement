@@ -1,14 +1,8 @@
-﻿using System.Windows.Media;
+﻿namespace FileManagementApp.Models;
 
-namespace FileManagementApp.Models;
-
-public class FileItem
+public class FileItem : FileSystemItem
 {
-    public string? Name { get; set; }
+    public string? Extension { get; set; }
 
-    public string? Path { get; set; }
-
-    public Brush? Foreground { get; set; }
-
-    public bool IsDirectory { get; set; }
+    public float? Size { get; set; }
 }

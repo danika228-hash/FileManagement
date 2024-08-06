@@ -1,30 +1,31 @@
 ﻿using FileManagementApp.Command;
 using FileManagementApp.Models;
+using FileManagementApp.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using System.Windows.Media;
 
 namespace FileManagementApp.ViewModels;
 
 public class MainViewModel : INotifyPropertyChanged
 {
-    private FileItem? _selectedFile;
-    private ObservableCollection<FileItem> _directoryContents;
+    private readonly IFileLoaderService _fileLoaderService;
+    private readonly IFileOpenerService _fileOpenerService;
+
+    private FileSystemItem? _selectedFile;
+    private ObservableCollection<FileSystemItem> _directoryContents;
     private FileViewsModel _selectedFileDetails;
 
-    public ObservableCollection<FileItem> Files { get; set; }
+    public ObservableCollection<FileSystemItem> Files { get; set; }
 
-    public ObservableCollection<FileItem> DirectoryContents
+    public ObservableCollection<FileSystemItem> DirectoryContents
     {
         get => _directoryContents;
         set { _directoryContents = value; OnPropertyChanged(); }
     }
 
-    public FileItem SelectedFile
+    public FileSystemItem SelectedFile
     {
         get => _selectedFile!;
         set
@@ -32,17 +33,18 @@ public class MainViewModel : INotifyPropertyChanged
             _selectedFile = value;
             OnPropertyChanged();
 
-            if (_selectedFile != null && _selectedFile.IsDirectory)
+            if (_selectedFile is DirectoryItem directory)
             {
-                LoadDirectoryContents(_selectedFile.Path!);
+                LoadDirectoryContentsAsync(directory.Path!);
+                SelectedFileDetails = null!;
             }
-            else if (_selectedFile != null)
+            else if (_selectedFile is FileItem file)
             {
                 SelectedFileDetails = new FileViewsModel
                 {
-                    Name = _selectedFile.Name!,
-                    Extension = Path.GetExtension(_selectedFile.Name)!,
-                    Size = GetFileSize(_selectedFile.Path!)
+                    Name = file.Name!,
+                    Extension = file.Extension!,
+                    Size = (float)file.Size!
                 };
             }
             else
@@ -50,34 +52,6 @@ public class MainViewModel : INotifyPropertyChanged
                 SelectedFileDetails = null!;
             }
         }
-    }
-
-    private void LoadDirectoryContents(string path)
-    {
-        DirectoryContents.Clear();
-        var directoryInfo = new DirectoryInfo(path);
-
-        foreach (var direct in directoryInfo.GetDirectories())
-        {
-            DirectoryContents.Add(new FileItem { Name = direct.Name, Path = direct.FullName, Foreground = Brushes.Blue, IsDirectory = true });
-        }
-
-        foreach (var file in directoryInfo.GetFiles())
-        {
-            DirectoryContents.Add(new FileItem { Name = file.Name, Path = file.FullName, Foreground = Brushes.Green, IsDirectory = false });
-        }
-    }
-
-    private float GetFileSize(string filePath)
-    {
-        if (File.Exists(filePath))
-        {
-            var fileInfo = new FileInfo(filePath);
-
-            return fileInfo.Length / 1024f;
-        }
-
-        return 0f;
     }
 
     public FileViewsModel SelectedFileDetails
@@ -89,65 +63,54 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand LoadFileCommand { get; }
     public ICommand OpenFileCommand { get; }
 
-    public MainViewModel()
+    public MainViewModel(IFileLoaderService fileLoaderService, IFileOpenerService fileOpenerService)
     {
-        Files = new ObservableCollection<FileItem>();
-        DirectoryContents = new ObservableCollection<FileItem>();
-        LoadFileCommand = new RelayCommand<string>(LoadFiles, path => !string.IsNullOrWhiteSpace(path));
+        _fileLoaderService = fileLoaderService;
+        _fileOpenerService = fileOpenerService;
+        Files = new ObservableCollection<FileSystemItem>();
+        DirectoryContents = new ObservableCollection<FileSystemItem>();
+        LoadFileCommand = new RelayCommand<string>(LoadFilesAsync, path => !string.IsNullOrWhiteSpace(path));
         OpenFileCommand = new RelayCommand(OpenFile, CanOpenFile);
     }
 
-    private void LoadFiles(string path)
+    private async void LoadFilesAsync(string path)
     {
-        if (!Directory.Exists(path))
-        {
-            Files.Clear();
-            DirectoryContents.Clear();
-            SelectedFileDetails = null!;
-
-            return;
-        }
-
+        var items = await _fileLoaderService.LoadFilesAsync(path);
         Files.Clear();
-        DirectoryContents.Clear();
-        var directoryInfo = new DirectoryInfo(path);
 
-        foreach (var direct in directoryInfo.GetDirectories())
+        foreach (var item in items)
         {
-            Files.Add(new FileItem { Name = direct.Name, Path = direct.FullName, Foreground = Brushes.Blue, IsDirectory = true });
+            Files.Add(item);
         }
+    }
 
-        foreach (var file in directoryInfo.GetFiles())
+    private async void LoadDirectoryContentsAsync(string directoryPath)
+    {
+        var contents = await _fileLoaderService.GetDirectoryContentsAsync(directoryPath);
+        DirectoryContents.Clear();
+
+        foreach (var item in contents)
         {
-            Files.Add(new FileItem { Name = file.Name, Path = file.FullName, Foreground = Brushes.Green, IsDirectory = false });
+            DirectoryContents.Add(item);
         }
     }
 
     private void OpenFile()
     {
-        if (SelectedFile != null && !SelectedFile.IsDirectory)
+        if (SelectedFile != null)
         {
-            Process.Start(new ProcessStartInfo()
-            {
-                FileName = SelectedFile.Path,
-                UseShellExecute = true,
-            });
-        }
-        else if (SelectedFile != null && SelectedFile.IsDirectory)
-        {
-            Process.Start(new ProcessStartInfo()
-            {
-                FileName = "explorer.exe",
-                Arguments = SelectedFile.Path,
-                UseShellExecute = true,
-            });
+            _fileOpenerService.OpenFile(SelectedFile.Path!);
         }
     }
 
     private bool CanOpenFile()
     {
-        return SelectedFile != null &&
-            (SelectedFile.Name!.EndsWith(".txt") || SelectedFile.Name.EndsWith(".xml") || SelectedFile.Name.EndsWith(".json"));
+        if (SelectedFile is FileItem file)
+        {
+            return _fileOpenerService.CanOpenFile(file.Path!);
+        }
+
+        return false;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

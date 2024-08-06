@@ -5,22 +5,20 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileManagementApp.Views"
         xmlns:viewmodels="clr-namespace:FileManagementApp.ViewModels"
+        xmlns:models="clr-namespace:FileManagementApp.Models"
         xmlns:converters="clr-namespace:FileManagementApp.Converters"
         mc:Ignorable="d"
         Title="File Explorer" Height="450" Width="800">
     <Window.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+        <converters:ItemTypeToVisibilityConverter x:Key="ItemTypeToVisibilityConverter"/>
+        <converters:FileTypeToForegroundConverter x:Key="FileTypeToForegroundConverter"/>
     </Window.Resources>
-    <Window.DataContext>
-        <viewmodels:MainViewModel/>
-    </Window.DataContext>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <TextBox Name="PathTextBox" Width="600" Margin="10" />
+        <TextBox Name="PathTextBox" Width="600" Margin="10" TextChanged="PathTextBox_TextChanged" />
         <Button Content="Browse" Width="100" Margin="10" HorizontalAlignment="Right" 
                 Command="{Binding LoadFileCommand}" CommandParameter="{Binding Text, ElementName=PathTextBox}" />
         <Grid Grid.Row="1" Margin="10">
@@ -33,29 +31,30 @@
                      MouseDoubleClick="FileListBox_MouseDoubleClick">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Name}" Foreground="{Binding Foreground}" />
+                        <TextBlock Text="{Binding Name}" Foreground="{Binding Converter={StaticResource FileTypeToForegroundConverter}}" />
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
             <StackPanel Grid.Column="1">
-                <StackPanel Visibility="{Binding SelectedFile.IsDirectory, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Visibility="{Binding SelectedFile, Converter={StaticResource ItemTypeToVisibilityConverter}, ConverterParameter=DirectoryItem}">
                     <TextBlock Text="Contents:" FontWeight="Bold" />
                     <ListBox ItemsSource="{Binding DirectoryContents}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Name}" Foreground="{Binding Foreground}" />
+                                <TextBlock Text="{Binding Name}" Foreground="Black" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </StackPanel>
-                <StackPanel Visibility="{Binding SelectedFile.IsDirectory, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+
+                <StackPanel Visibility="{Binding SelectedFile, Converter={StaticResource ItemTypeToVisibilityConverter}, ConverterParameter=FileItem}">
                     <TextBlock Text="Name:" FontWeight="Bold" />
-                    <TextBlock Text="{Binding SelectedFileDetails.Name}" />
+                    <TextBlock Text="{Binding SelectedFile.Name}" />
                     <TextBlock Text="Extension:" FontWeight="Bold" />
-                    <TextBlock Text="{Binding SelectedFileDetails.Extension}" />
+                    <TextBlock Text="{Binding SelectedFile.Extension}" />
                     <TextBlock Text="Size:" FontWeight="Bold" />
-                    <TextBlock Text="{Binding SelectedFileDetails.Size}" />
+                    <TextBlock Text="{Binding SelectedFile.Size}" />
                 </StackPanel>
             </StackPanel>
         </Grid>
